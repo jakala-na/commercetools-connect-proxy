@@ -1,4 +1,3 @@
-import { expect } from '@jest/globals';
 import request from 'supertest';
 import app from '../../src/app';
 import * as enventController from '../../src/controllers/event.controller';
@@ -22,14 +21,14 @@ describe('Testing router', () => {
     });
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      message: 'Bad request: No customer id in the Pub/Sub message',
+      message: 'Bad request: Empty message data',
     });
   });
   test('Post empty body', async () => {
     const response = await request(app).post('/event');
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      message: 'Bad request: Wrong No Pub/Sub message format',
+      message: 'Bad request: Wrong Pub/Sub message format',
     });
   });
 });
