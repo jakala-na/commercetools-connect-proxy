@@ -1,5 +1,6 @@
 import {
   AzureServiceBusDestination,
+  ChangeSubscription,
   Destination,
   GoogleCloudPubSubDestination,
   MessageSubscription,
@@ -21,23 +22,45 @@ const DEFAULT_MESSAGE_SUBSCRIPTIONS: MessageSubscription[] = [
   },
 ];
 
-export function parseSubscriptionConfig(
+const DEFAULT_CHANGE_SUBSCRIPTIONS: ChangeSubscription[] = [];
+
+export function parseMessageSubscriptionConfig(
   configJson?: string
 ): MessageSubscription[] {
   if (!configJson) {
-    logger.info('No SUBSCRIPTION_CONFIG provided, using default Order subscriptions');
+    logger.info('No MESSAGE_SUBSCRIPTION_CONFIG provided, using default Order subscriptions');
     return DEFAULT_MESSAGE_SUBSCRIPTIONS;
   }
   try {
     const parsed = JSON.parse(configJson);
     if (!Array.isArray(parsed)) {
-      throw new Error('SUBSCRIPTION_CONFIG must be a JSON array');
+      throw new Error('MESSAGE_SUBSCRIPTION_CONFIG must be a JSON array');
     }
-    logger.info(`Parsed ${parsed.length} subscription configurations`);
+    logger.info(`Parsed ${parsed.length} message subscription configurations`);
     return parsed as MessageSubscription[];
   } catch (error) {
-    logger.warn(`Failed to parse SUBSCRIPTION_CONFIG: ${error}. Using defaults.`);
+    logger.warn(`Failed to parse MESSAGE_SUBSCRIPTION_CONFIG: ${error}. Using defaults.`);
     return DEFAULT_MESSAGE_SUBSCRIPTIONS;
+  }
+}
+
+export function parseChangeSubscriptionConfig(
+  configJson?: string
+): ChangeSubscription[] {
+  if (!configJson) {
+    logger.info('No CHANGE_SUBSCRIPTION_CONFIG provided, no change subscriptions will be created');
+    return DEFAULT_CHANGE_SUBSCRIPTIONS;
+  }
+  try {
+    const parsed = JSON.parse(configJson);
+    if (!Array.isArray(parsed)) {
+      throw new Error('CHANGE_SUBSCRIPTION_CONFIG must be a JSON array');
+    }
+    logger.info(`Parsed ${parsed.length} change subscription configurations`);
+    return parsed as ChangeSubscription[];
+  } catch (error) {
+    logger.warn(`Failed to parse CHANGE_SUBSCRIPTION_CONFIG: ${error}. Using defaults.`);
+    return DEFAULT_CHANGE_SUBSCRIPTIONS;
   }
 }
 
@@ -45,36 +68,41 @@ export async function createGcpPubSubProxySubscription(
   apiRoot: ByProjectKeyRequestBuilder,
   topicName: string,
   projectId: string,
-  messageSubscriptions: MessageSubscription[]
+  messageSubscriptions: MessageSubscription[],
+  changeSubscriptions: ChangeSubscription[]
 ): Promise<void> {
   const destination: GoogleCloudPubSubDestination = {
     type: 'GoogleCloudPubSub',
     topic: topicName,
     projectId,
   };
-  await createSubscription(apiRoot, destination, messageSubscriptions);
+  await createSubscription(apiRoot, destination, messageSubscriptions, changeSubscriptions);
 }
 
 export async function createAzureServiceBusProxySubscription(
   apiRoot: ByProjectKeyRequestBuilder,
   connectionString: string,
-  messageSubscriptions: MessageSubscription[]
+  messageSubscriptions: MessageSubscription[],
+  changeSubscriptions: ChangeSubscription[]
 ): Promise<void> {
   const destination: AzureServiceBusDestination = {
     type: 'AzureServiceBus',
     connectionString: connectionString,
   };
-  await createSubscription(apiRoot, destination, messageSubscriptions);
+  await createSubscription(apiRoot, destination, messageSubscriptions, changeSubscriptions);
 }
 
 async function createSubscription(
   apiRoot: ByProjectKeyRequestBuilder,
   destination: Destination,
-  messageSubscriptions: MessageSubscription[]
+  messageSubscriptions: MessageSubscription[],
+  changeSubscriptions: ChangeSubscription[]
 ) {
   await deleteProxySubscription(apiRoot);
 
-  logger.info(`Creating subscription with ${messageSubscriptions.length} message configurations`);
+  logger.info(
+    `Creating subscription with ${messageSubscriptions.length} message and ${changeSubscriptions.length} change configurations`
+  );
 
   await apiRoot
     .subscriptions()
@@ -82,7 +110,8 @@ async function createSubscription(
       body: {
         key: EVENT_PROXY_SUBSCRIPTION_KEY,
         destination,
-        messages: messageSubscriptions,
+        messages: messageSubscriptions.length > 0 ? messageSubscriptions : undefined,
+        changes: changeSubscriptions.length > 0 ? changeSubscriptions : undefined,
       },
     })
     .execute();

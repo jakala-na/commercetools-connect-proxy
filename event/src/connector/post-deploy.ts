@@ -6,24 +6,32 @@ import { assertError, assertString } from '../utils/assert.utils';
 import {
   createAzureServiceBusProxySubscription,
   createGcpPubSubProxySubscription,
-  parseSubscriptionConfig,
+  parseChangeSubscriptionConfig,
+  parseMessageSubscriptionConfig,
 } from './actions';
 
 const CONNECT_GCP_TOPIC_NAME_KEY = 'CONNECT_GCP_TOPIC_NAME';
 const CONNECT_GCP_PROJECT_ID_KEY = 'CONNECT_GCP_PROJECT_ID';
 const CONNECT_PROVIDER_KEY = 'CONNECT_PROVIDER';
 const CONNECT_AZURE_CONNECTION_STRING_KEY = 'CONNECT_AZURE_CONNECTION_STRING';
-const SUBSCRIPTION_CONFIG_KEY = 'SUBSCRIPTION_CONFIG';
+const MESSAGE_SUBSCRIPTION_CONFIG_KEY = 'MESSAGE_SUBSCRIPTION_CONFIG';
+const CHANGE_SUBSCRIPTION_CONFIG_KEY = 'CHANGE_SUBSCRIPTION_CONFIG';
 
 async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const connectProvider = properties.get(CONNECT_PROVIDER_KEY);
   assertString(connectProvider, CONNECT_PROVIDER_KEY);
 
   const apiRoot = createApiRoot();
-  const subscriptionConfig = properties.get(SUBSCRIPTION_CONFIG_KEY) as
+
+  const messageSubscriptionConfig = properties.get(MESSAGE_SUBSCRIPTION_CONFIG_KEY) as
     | string
     | undefined;
-  const messageSubscriptions = parseSubscriptionConfig(subscriptionConfig);
+  const changeSubscriptionConfig = properties.get(CHANGE_SUBSCRIPTION_CONFIG_KEY) as
+    | string
+    | undefined;
+
+  const messageSubscriptions = parseMessageSubscriptionConfig(messageSubscriptionConfig);
+  const changeSubscriptions = parseChangeSubscriptionConfig(changeSubscriptionConfig);
 
   switch (connectProvider) {
     case 'AZURE': {
@@ -34,7 +42,8 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
       await createAzureServiceBusProxySubscription(
         apiRoot,
         connectionString,
-        messageSubscriptions
+        messageSubscriptions,
+        changeSubscriptions
       );
       break;
     }
@@ -47,7 +56,8 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
         apiRoot,
         topicName,
         projectId,
-        messageSubscriptions
+        messageSubscriptions,
+        changeSubscriptions
       );
     }
   }

@@ -137,13 +137,6 @@ export const post = async (request: Request, response: Response) => {
 
   const jsonData = JSON.parse(decodedData);
 
-  if (jsonData.notificationType === 'ResourceCreated') {
-    logger.info('Skipping ResourceCreated notification');
-    return response
-      .status(200)
-      .send({ status: 'skipped', reason: 'ResourceCreated notification' });
-  }
-
   const webhookPayload: WebhookPayload = {
     timestamp: new Date().toISOString(),
     notificationType: jsonData.notificationType,
