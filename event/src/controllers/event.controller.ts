@@ -108,13 +108,6 @@ async function forwardToExternalApi(
 }
 
 export const post = async (request: Request, response: Response) => {
-  if (!API_ENDPOINT) {
-    throw new CustomError(500, 'API_ENDPOINT is not configured');
-  }
-  if (!WEBHOOK_SECRET) {
-    throw new CustomError(500, 'WEBHOOK_SECRET is not configured');
-  }
-
   if (!request.body) {
     logger.error('Missing request body.');
     throw new CustomError(400, 'Bad request: No Pub/Sub message was received');
@@ -133,6 +126,13 @@ export const post = async (request: Request, response: Response) => {
 
   if (!decodedData) {
     throw new CustomError(400, 'Bad request: Empty message data');
+  }
+
+  if (!API_ENDPOINT) {
+    throw new CustomError(500, 'API_ENDPOINT is not configured');
+  }
+  if (!WEBHOOK_SECRET) {
+    throw new CustomError(500, 'WEBHOOK_SECRET is not configured');
   }
 
   const jsonData = JSON.parse(decodedData);

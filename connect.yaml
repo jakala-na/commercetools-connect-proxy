@@ -15,7 +15,7 @@ deployAs:
           description: External API endpoint URL to forward events to
           required: true
         - key: SUBSCRIPTION_CONFIG
-          description: JSON array of message subscriptions (e.g., [{"resourceTypeId":"order","types":["OrderCreated"]}])
+          description: JSON object with messages and changes arrays (e.g., {"messages":[{"resourceTypeId":"order","types":["OrderCreated"]}],"changes":[{"resourceTypeId":"product"}]}). Invalid JSON or structure fails deployment.
           required: false
         - key: MAX_RETRIES
           description: Maximum retry attempts for failed webhook deliveries

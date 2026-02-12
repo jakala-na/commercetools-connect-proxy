@@ -24,44 +24,49 @@ const DEFAULT_MESSAGE_SUBSCRIPTIONS: MessageSubscription[] = [
 
 const DEFAULT_CHANGE_SUBSCRIPTIONS: ChangeSubscription[] = [];
 
-export function parseMessageSubscriptionConfig(
-  configJson?: string
-): MessageSubscription[] {
-  if (!configJson) {
-    logger.info('No MESSAGE_SUBSCRIPTION_CONFIG provided, using default Order subscriptions');
-    return DEFAULT_MESSAGE_SUBSCRIPTIONS;
-  }
-  try {
-    const parsed = JSON.parse(configJson);
-    if (!Array.isArray(parsed)) {
-      throw new Error('MESSAGE_SUBSCRIPTION_CONFIG must be a JSON array');
-    }
-    logger.info(`Parsed ${parsed.length} message subscription configurations`);
-    return parsed as MessageSubscription[];
-  } catch (error) {
-    logger.warn(`Failed to parse MESSAGE_SUBSCRIPTION_CONFIG: ${error}. Using defaults.`);
-    return DEFAULT_MESSAGE_SUBSCRIPTIONS;
-  }
+interface ParsedSubscriptionConfig {
+  messageSubscriptions: MessageSubscription[];
+  changeSubscriptions: ChangeSubscription[];
 }
 
-export function parseChangeSubscriptionConfig(
-  configJson?: string
-): ChangeSubscription[] {
-  if (!configJson) {
-    logger.info('No CHANGE_SUBSCRIPTION_CONFIG provided, no change subscriptions will be created');
-    return DEFAULT_CHANGE_SUBSCRIPTIONS;
+export function parseSubscriptionConfig(configJson?: string): ParsedSubscriptionConfig {
+  if (!configJson || configJson.trim().length === 0) {
+    logger.info('No SUBSCRIPTION_CONFIG provided, using default subscriptions');
+    return {
+      messageSubscriptions: DEFAULT_MESSAGE_SUBSCRIPTIONS,
+      changeSubscriptions: DEFAULT_CHANGE_SUBSCRIPTIONS,
+    };
   }
-  try {
-    const parsed = JSON.parse(configJson);
-    if (!Array.isArray(parsed)) {
-      throw new Error('CHANGE_SUBSCRIPTION_CONFIG must be a JSON array');
-    }
-    logger.info(`Parsed ${parsed.length} change subscription configurations`);
-    return parsed as ChangeSubscription[];
-  } catch (error) {
-    logger.warn(`Failed to parse CHANGE_SUBSCRIPTION_CONFIG: ${error}. Using defaults.`);
-    return DEFAULT_CHANGE_SUBSCRIPTIONS;
+
+  const parsed = JSON.parse(configJson) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('SUBSCRIPTION_CONFIG must be a JSON object');
   }
+
+  const config = parsed as {
+    messages?: unknown;
+    changes?: unknown;
+  };
+
+  if (config.messages !== undefined && !Array.isArray(config.messages)) {
+    throw new Error('SUBSCRIPTION_CONFIG.messages must be a JSON array');
+  }
+
+  if (config.changes !== undefined && !Array.isArray(config.changes)) {
+    throw new Error('SUBSCRIPTION_CONFIG.changes must be a JSON array');
+  }
+
+  const messageSubscriptions = (config.messages ?? DEFAULT_MESSAGE_SUBSCRIPTIONS) as MessageSubscription[];
+  const changeSubscriptions = (config.changes ?? DEFAULT_CHANGE_SUBSCRIPTIONS) as ChangeSubscription[];
+
+  logger.info(
+    `Parsed SUBSCRIPTION_CONFIG with ${messageSubscriptions.length} message and ${changeSubscriptions.length} change configurations`
+  );
+
+  return {
+    messageSubscriptions,
+    changeSubscriptions,
+  };
 }
 
 export async function createGcpPubSubProxySubscription(
