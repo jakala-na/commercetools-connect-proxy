@@ -17,8 +17,6 @@ export const readConfiguration = () => {
     region: process.env.CTP_REGION as string,
     apiEndpoint: process.env.API_ENDPOINT as string,
     webhookSecret: process.env.WEBHOOK_SECRET as string,
-    maxRetries: parseInt(process.env.MAX_RETRIES || '3', 10),
-    retryDelayMs: parseInt(process.env.RETRY_DELAY_MS || '1000', 10),
     subscriptionConfig: process.env.SUBSCRIPTION_CONFIG,
     additionalHeaders: process.env.ADDITIONAL_HEADERS,
   };

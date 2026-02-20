@@ -17,14 +17,6 @@ deployAs:
         - key: SUBSCRIPTION_CONFIG
           description: JSON object with messages and changes arrays (e.g., {"messages":[{"resourceTypeId":"order","types":["OrderCreated"]}],"changes":[{"resourceTypeId":"product"}]}). Invalid JSON or structure fails deployment.
           required: false
-        - key: MAX_RETRIES
-          description: Maximum retry attempts for failed webhook deliveries
-          required: false
-          default: "3"
-        - key: RETRY_DELAY_MS
-          description: Initial delay in milliseconds between retries (uses exponential backoff)
-          required: false
-          default: "1000"
         - key: ADDITIONAL_HEADERS
           description: JSON object of additional headers to send with webhook requests (e.g., {"X-Vercel-Protection-Bypass":"secret"})
           required: false

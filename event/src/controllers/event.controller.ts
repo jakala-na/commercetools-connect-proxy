@@ -5,8 +5,6 @@ import { logger } from '../utils/logger.utils';
 
 const API_ENDPOINT = process.env.API_ENDPOINT;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-const MAX_RETRIES = parseInt(process.env.MAX_RETRIES || '3', 10);
-const RETRY_DELAY_MS = parseInt(process.env.RETRY_DELAY_MS || '1000', 10);
 const ADDITIONAL_HEADERS = process.env.ADDITIONAL_HEADERS;
 
 function parseAdditionalHeaders(): Record<string, string> {
@@ -58,10 +56,7 @@ function generateWebhookHeaders(payload: string): Record<string, string> {
   };
 }
 
-async function forwardToExternalApi(
-  payload: WebhookPayload,
-  retryCount = 0
-): Promise<globalThis.Response> {
+async function forwardToExternalApi(payload: WebhookPayload): Promise<void> {
   const payloadString = JSON.stringify(payload);
   const headers = generateWebhookHeaders(payloadString);
 
@@ -73,36 +68,27 @@ async function forwardToExternalApi(
     });
 
     if (!response.ok) {
-      if (response.status >= 500 || response.status === 429) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const status = response.status;
+
+      if (status >= 500 || status === 429) {
+        logger.error(`Retryable webhook delivery failure with status ${status}`);
+        throw new CustomError(502, `External API returned retryable error: ${status}`);
       }
-      logger.error(`Webhook delivery failed with status ${response.status}`);
-      throw new CustomError(
-        502,
-        `External API returned error: ${response.status}`
+
+      logger.warn(
+        `Non-retryable webhook delivery failure with status ${status}. Acknowledging message.`
       );
+      return;
     }
 
     logger.info(`Event forwarded successfully to ${API_ENDPOINT}`);
-    return response;
+    return;
   } catch (error) {
-    if (
-      retryCount < MAX_RETRIES &&
-      !(error instanceof CustomError && error.statusCode === 502)
-    ) {
-      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount);
-      logger.warn(
-        `Retry ${retryCount + 1}/${MAX_RETRIES} after ${delay}ms: ${error}`
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return forwardToExternalApi(payload, retryCount + 1);
-    }
-
     if (error instanceof CustomError) {
       throw error;
     }
 
-    logger.error(`Failed to forward event after ${MAX_RETRIES} retries: ${error}`);
+    logger.error(`Failed to forward event: ${error}`);
     throw new CustomError(502, `Failed to forward event: ${error}`);
   }
 }
