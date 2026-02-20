@@ -3,8 +3,8 @@ deployAs:
     applicationType: event
     endpoint: /event
     scripts:
-      postDeploy: npm install && npm run build && npm run connector:post-deploy
-      preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
+      postDeploy: yarn install --frozen-lockfile && yarn build && yarn connector:post-deploy
+      preUndeploy: yarn install --frozen-lockfile && yarn build && yarn connector:pre-undeploy
     configuration:
       standardConfiguration:
         - key: CTP_REGION
@@ -39,13 +39,3 @@ deployAs:
         - key: WEBHOOK_SECRET
           description: Secret key for HMAC signature generation (shared with receiving API)
           required: true
-inheritAs:
-  configuration:
-    securedConfiguration:
-      - key: GLOBAL_SECURED_CONFIGURATION
-        description: This secured configuration will configuration will be applied to all applications
-        required: true
-    standardConfiguration:
-      - key: GLOBAL_STANDARD_CONFIGURATION
-        description: This standard configuration will configuration will be applied to all applications
-        required: true

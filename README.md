@@ -1,22 +1,92 @@
-<p align="center">
-  <a href="https://commercetools.com/">
-    <img alt="commercetools logo" src="https://unpkg.com/@commercetools-frontend/assets/logos/commercetools_primary-logo_horizontal_RGB.png">
-  </a></br>
-  <b>Connect Application Starter in TypeScript</b>
-</p>
+# commercetools Connect Proxy
 
-This is the `starter-typescript` template to develop [connect applications](https://marketplace.commercetools.com/) in TypeScript.
+This project is a commercetools Connect-hosted event proxy for teams that already run their business logic outside Connect.
 
-## Instructions
+It creates and manages a commercetools Subscription (in `postDeploy`), receives events through the Connect-managed queue/topic delivery pipeline, and forwards each event to an external API (for example, a webhook receiver in Vercel).
 
-Use `create-connect-app` cli with `starter-typescript` as `template` value to download this template repository to build the integration application , folder structure needs to be followed to ensure certification & deployment from commercetools connect team as stated [here](https://github.com/commercetools/connect-application-kit#readme) 
+## What This Is For
 
-## Architecture principles for building an connect application 
+Use this connector when:
 
-* Connector solution should be lightweight in nature
-* Connector solutions should follow test driven development. Unit , Integration (& E2E) tests should be included and successfully passed to be used
-* No hardcoding of customer related config. If needed, values in an environment file which should not be maintained in repository
-* Connector solution should be supported with detailed documentation
-* Connectors should be point to point in nature, currently doesnt support any persistence capabilities apart from in memory persistence
-* Connector solution should use open source technologies, although connector itself can be private for specific customer(s)
-* Code should not contain console.log statements, use [the included logger](https://github.com/commercetools/merchant-center-application-kit/tree/main/packages-backend/loggers#readme) instead.
+- your core logic lives in an existing monorepo or API outside commercetools Connect
+- you still want commercetools events (`messages` and/or `changes`) delivered reliably
+- you want Connect to host only the thin forwarding layer
+
+The Express event app does not contain domain business logic. Its job is to transform and forward events.
+
+## High-Level Flow
+
+1. `postDeploy` creates/updates a commercetools Subscription that points to Connect-managed messaging infrastructure.
+2. commercetools publishes matching events to that destination.
+3. The Connect event app (`/event`) receives the queued message.
+4. The app forwards the payload to `API_ENDPOINT` with HMAC headers.
+5. The app response controls queue acknowledgement and retries.
+
+## Retry and Acknowledgement Behavior
+
+The proxy performs a single forward attempt per delivery attempt.
+
+- Retryable downstream failures (`429`, `5xx`, transport/network failures) return non-2xx from the app, so Connect/GCP retries.
+- Non-retryable downstream `4xx` responses are acknowledged to avoid retry storms.
+
+This keeps retry ownership in the queue layer instead of in-process retry loops.
+
+## Subscription Key Strategy
+
+Each deployment must provide `SUBSCRIPTION_SUFFIX`.
+
+The connector builds the final subscription key as:
+
+`ct-event-proxy-subscription-<SUBSCRIPTION_SUFFIX>`
+
+Why: this prevents multiple deployments in the same commercetools project from overwriting each other's subscription.
+
+Example suffixes:
+
+- `dev-a`
+- `dev-b`
+- `staging`
+- `prod`
+
+## Required commercetools Scope
+
+For this proxy behavior, the API client only needs:
+
+- `manage_subscriptions:{projectKey}`
+
+## Configuration
+
+Defined in `connect.yaml`.
+
+Standard configuration:
+
+- `CTP_REGION` (required)
+- `API_ENDPOINT` (required): external webhook/API URL to receive forwarded events
+- `SUBSCRIPTION_SUFFIX` (required): unique suffix per deployment in the same project
+- `SUBSCRIPTION_CONFIG` (optional): JSON for `messages` and `changes` filters
+- `ADDITIONAL_HEADERS` (optional): JSON headers appended to outbound webhook request
+
+Secured configuration:
+
+- `CTP_PROJECT_KEY` (required)
+- `CTP_CLIENT_ID` (required)
+- `CTP_CLIENT_SECRET` (required)
+- `CTP_SCOPE` (required)
+- `WEBHOOK_SECRET` (required): used for HMAC signature headers on forwarded requests
+
+## Local Development (Event App)
+
+From `event/`:
+
+```bash
+yarn install --frozen-lockfile
+yarn build
+yarn test
+yarn start:dev
+```
+
+## Notes
+
+- `postDeploy` creates/updates only this deployment's subscription key.
+- `preUndeploy` deletes only this deployment's subscription key.
+- If you deploy the connector more than once to the same project, always use different `SUBSCRIPTION_SUFFIX` values.
