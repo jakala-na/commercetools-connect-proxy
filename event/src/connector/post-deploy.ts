@@ -4,6 +4,7 @@ dotenv.config();
 import { createApiRoot } from '../client/create.client';
 import { assertError, assertString } from '../utils/assert.utils';
 import {
+  buildSubscriptionKey,
   createAzureServiceBusProxySubscription,
   createGcpPubSubProxySubscription,
   parseSubscriptionConfig,
@@ -14,6 +15,7 @@ const CONNECT_GCP_PROJECT_ID_KEY = 'CONNECT_GCP_PROJECT_ID';
 const CONNECT_PROVIDER_KEY = 'CONNECT_PROVIDER';
 const CONNECT_AZURE_CONNECTION_STRING_KEY = 'CONNECT_AZURE_CONNECTION_STRING';
 const SUBSCRIPTION_CONFIG_KEY = 'SUBSCRIPTION_CONFIG';
+const SUBSCRIPTION_SUFFIX_KEY = 'SUBSCRIPTION_SUFFIX';
 
 async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const connectProvider = properties.get(CONNECT_PROVIDER_KEY);
@@ -22,6 +24,9 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const apiRoot = createApiRoot();
 
   const subscriptionConfig = properties.get(SUBSCRIPTION_CONFIG_KEY) as string | undefined;
+  const subscriptionSuffix = properties.get(SUBSCRIPTION_SUFFIX_KEY);
+  assertString(subscriptionSuffix, SUBSCRIPTION_SUFFIX_KEY);
+  const subscriptionKey = buildSubscriptionKey(subscriptionSuffix);
   const { messageSubscriptions, changeSubscriptions } = parseSubscriptionConfig(subscriptionConfig);
 
   switch (connectProvider) {
@@ -32,6 +37,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
       assertString(connectionString, CONNECT_AZURE_CONNECTION_STRING_KEY);
       await createAzureServiceBusProxySubscription(
         apiRoot,
+        subscriptionKey,
         connectionString,
         messageSubscriptions,
         changeSubscriptions
@@ -45,6 +51,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
       assertString(projectId, CONNECT_GCP_PROJECT_ID_KEY);
       await createGcpPubSubProxySubscription(
         apiRoot,
+        subscriptionKey,
         topicName,
         projectId,
         messageSubscriptions,

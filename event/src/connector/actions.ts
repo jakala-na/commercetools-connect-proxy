@@ -8,7 +8,7 @@ import {
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import { logger } from '../utils/logger.utils';
 
-const EVENT_PROXY_SUBSCRIPTION_KEY = 'ct-event-proxy-subscription';
+const EVENT_PROXY_SUBSCRIPTION_KEY_PREFIX = 'ct-event-proxy-subscription';
 
 const DEFAULT_MESSAGE_SUBSCRIPTIONS: MessageSubscription[] = [
   {
@@ -69,8 +69,17 @@ export function parseSubscriptionConfig(configJson?: string): ParsedSubscription
   };
 }
 
+export function buildSubscriptionKey(suffix: string): string {
+  const normalizedSuffix = suffix.trim();
+  if (normalizedSuffix.length === 0) {
+    throw new Error('SUBSCRIPTION_SUFFIX must not be empty');
+  }
+  return `${EVENT_PROXY_SUBSCRIPTION_KEY_PREFIX}-${normalizedSuffix}`;
+}
+
 export async function createGcpPubSubProxySubscription(
   apiRoot: ByProjectKeyRequestBuilder,
+  subscriptionKey: string,
   topicName: string,
   projectId: string,
   messageSubscriptions: MessageSubscription[],
@@ -81,11 +90,18 @@ export async function createGcpPubSubProxySubscription(
     topic: topicName,
     projectId,
   };
-  await createSubscription(apiRoot, destination, messageSubscriptions, changeSubscriptions);
+  await createSubscription(
+    apiRoot,
+    subscriptionKey,
+    destination,
+    messageSubscriptions,
+    changeSubscriptions
+  );
 }
 
 export async function createAzureServiceBusProxySubscription(
   apiRoot: ByProjectKeyRequestBuilder,
+  subscriptionKey: string,
   connectionString: string,
   messageSubscriptions: MessageSubscription[],
   changeSubscriptions: ChangeSubscription[]
@@ -94,16 +110,23 @@ export async function createAzureServiceBusProxySubscription(
     type: 'AzureServiceBus',
     connectionString: connectionString,
   };
-  await createSubscription(apiRoot, destination, messageSubscriptions, changeSubscriptions);
+  await createSubscription(
+    apiRoot,
+    subscriptionKey,
+    destination,
+    messageSubscriptions,
+    changeSubscriptions
+  );
 }
 
 async function createSubscription(
   apiRoot: ByProjectKeyRequestBuilder,
+  subscriptionKey: string,
   destination: Destination,
   messageSubscriptions: MessageSubscription[],
   changeSubscriptions: ChangeSubscription[]
 ) {
-  await deleteProxySubscription(apiRoot);
+  await deleteProxySubscription(apiRoot, subscriptionKey);
 
   logger.info(
     `Creating subscription with ${messageSubscriptions.length} message and ${changeSubscriptions.length} change configurations`
@@ -113,7 +136,7 @@ async function createSubscription(
     .subscriptions()
     .post({
       body: {
-        key: EVENT_PROXY_SUBSCRIPTION_KEY,
+        key: subscriptionKey,
         destination,
         messages: messageSubscriptions.length > 0 ? messageSubscriptions : undefined,
         changes: changeSubscriptions.length > 0 ? changeSubscriptions : undefined,
@@ -125,7 +148,8 @@ async function createSubscription(
 }
 
 export async function deleteProxySubscription(
-  apiRoot: ByProjectKeyRequestBuilder
+  apiRoot: ByProjectKeyRequestBuilder,
+  subscriptionKey: string
 ): Promise<void> {
   const {
     body: { results: subscriptions },
@@ -133,18 +157,18 @@ export async function deleteProxySubscription(
     .subscriptions()
     .get({
       queryArgs: {
-        where: `key = "${EVENT_PROXY_SUBSCRIPTION_KEY}"`,
+        where: `key = "${subscriptionKey}"`,
       },
     })
     .execute();
 
   if (subscriptions.length > 0) {
     const subscription = subscriptions[0];
-    logger.info(`Deleting existing subscription: ${EVENT_PROXY_SUBSCRIPTION_KEY}`);
+    logger.info(`Deleting existing subscription: ${subscriptionKey}`);
 
     await apiRoot
       .subscriptions()
-      .withKey({ key: EVENT_PROXY_SUBSCRIPTION_KEY })
+      .withKey({ key: subscriptionKey })
       .delete({
         queryArgs: {
           version: subscription.version,

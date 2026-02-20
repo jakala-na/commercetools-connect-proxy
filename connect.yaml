@@ -14,6 +14,9 @@ deployAs:
         - key: API_ENDPOINT
           description: External API endpoint URL to forward events to
           required: true
+        - key: SUBSCRIPTION_SUFFIX
+          description: Suffix appended to fixed key prefix "ct-event-proxy-subscription-" (e.g., "dev-a"). Use a different suffix per deployment in the same commercetools project to avoid deployments overwriting each other's subscription.
+          required: true
         - key: SUBSCRIPTION_CONFIG
           description: JSON object with messages and changes arrays (e.g., {"messages":[{"resourceTypeId":"order","types":["OrderCreated"]}],"changes":[{"resourceTypeId":"product"}]}). Invalid JSON or structure fails deployment.
           required: false
