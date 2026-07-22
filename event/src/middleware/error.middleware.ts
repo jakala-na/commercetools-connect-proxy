@@ -19,11 +19,14 @@ export const errorMiddleware: ErrorRequestHandler = (
     return;
   }
 
+  const httpStatus = (error as { status?: unknown }).status;
+  const statusCode = typeof httpStatus === 'number' ? httpStatus : 500;
+
   res
-    .status(500)
+    .status(statusCode)
     .send(
-      isDevelopment
-        ? { messge: error.message }
+      isDevelopment || statusCode < 500
+        ? { message: error.message }
         : { message: 'Internal server error' }
     );
 };

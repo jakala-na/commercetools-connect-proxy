@@ -8,6 +8,9 @@ describe('Testing router', () => {
   beforeEach(() => {
     (readConfiguration as jest.Mock).mockClear();
   });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
   test('Post to non existing route', async () => {
     const response = await request(app).post('/none');
     expect(response.status).toBe(404);
@@ -30,6 +33,45 @@ describe('Testing router', () => {
     expect(response.body).toEqual({
       message: 'Bad request: Wrong Pub/Sub message format',
     });
+  });
+
+  test('accepts Pub/Sub envelopes larger than the body-parser default limit', async () => {
+    const postMock = jest
+      .spyOn(enventController, 'post')
+      .mockImplementation(async (_request, response) => {
+        response.status(200).send({ status: 'forwarded' });
+      });
+    const data = Buffer.from(
+      JSON.stringify({ value: 'x'.repeat(100_000) })
+    ).toString('base64');
+
+    const response = await request(app).post('/event').send({
+      message: { data },
+    });
+
+    expect(response.status).toBe(200);
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves body-parser HTTP errors', async () => {
+    const response = await request(app)
+      .post('/event')
+      .set('Content-Type', 'application/json')
+      .send('{"message":');
+
+    expect(response.status).toBe(400);
+  });
+
+  test('rejects Pub/Sub envelopes above the configured limit with 413', async () => {
+    const data = Buffer.from(
+      JSON.stringify({ value: 'x'.repeat(800_000) })
+    ).toString('base64');
+
+    const response = await request(app).post('/event').send({
+      message: { data },
+    });
+
+    expect(response.status).toBe(413);
   });
 });
 describe('unexpected error', () => {

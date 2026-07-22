@@ -28,6 +28,7 @@ The proxy performs a single forward attempt per delivery attempt.
 
 - Retryable downstream failures (`429`, `5xx`, transport/network failures) return non-2xx from the app, so Connect/GCP retries.
 - Non-retryable downstream `4xx` responses are acknowledged to avoid retry storms.
+- Incoming Pub/Sub HTTP envelopes are accepted up to 1 MB; larger requests return `413`.
 
 This keeps retry ownership in the queue layer instead of in-process retry loops.
 

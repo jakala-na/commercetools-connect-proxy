@@ -11,6 +11,8 @@ import { readConfiguration } from './utils/config.utils';
 import { errorMiddleware } from './middleware/error.middleware';
 import CustomError from './errors/custom.error';
 
+const REQUEST_BODY_LIMIT = '1mb';
+
 // Read env variables
 readConfiguration();
 
@@ -19,8 +21,10 @@ const app: Express = express();
 app.disable('x-powered-by');
 
 // Define configurations
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: REQUEST_BODY_LIMIT }));
+app.use(
+  bodyParser.urlencoded({ extended: true, limit: REQUEST_BODY_LIMIT })
+);
 
 // Define routes
 app.use('/event', EventRoutes);
